@@ -5,6 +5,14 @@ on:
     - cron: '0 0 * * 1'   # 매주 월요일 09:00 KST (UTC 월요일 00:00)
   workflow_dispatch:
     inputs:
+      target:
+        description: '발송 대상 선택'
+        type: choice
+        default: all
+        options:
+          - all
+          - channel
+          - dm
       dry_run:
         description: '시뮬레이션만 (실제 발송 안함)'
         type: boolean
@@ -28,5 +36,6 @@ jobs:
         env:
           TEAMS_WEBHOOK_URL_CHANNEL: ${{ secrets.TEAMS_WEBHOOK_URL_CHANNEL }}
           TEAMS_WEBHOOK_URL_DM: ${{ secrets.TEAMS_WEBHOOK_URL_DM }}
+          TARGET: ${{ inputs.target || 'all' }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
         run: python notify_teams.py

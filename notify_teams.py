@@ -155,13 +155,14 @@ def send_to_teams(card, webhook_url):
 
 
 def collect_webhooks():
-    """등록된 Webhook URL들을 라벨과 함께 모음. 있는 것만 발송 대상."""
+    """발송 대상 수집. TARGET 환경변수로 필터 가능: all / channel / dm"""
+    target_filter = os.environ.get("TARGET", "all").lower()
     targets = {}
     channel_url = os.environ.get("TEAMS_WEBHOOK_URL_CHANNEL")
     dm_url = os.environ.get("TEAMS_WEBHOOK_URL_DM")
-    if channel_url:
+    if channel_url and target_filter in ("all", "channel"):
         targets["채널"] = channel_url
-    if dm_url:
+    if dm_url and target_filter in ("all", "dm"):
         targets["담당자 DM"] = dm_url
     return targets
 
