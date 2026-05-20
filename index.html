@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC 프로모션 대시보드</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222535;
+    --border: #2e3145;
+    --text: #e8eaf0;
+    --text-dim: #7c82a0;
+    --accent: #6366f1;
+    --accent2: #818cf8;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  header {
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface);
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  header .date { color: var(--text-dim); font-size: 12px; }
+  header .today-badge {
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 4px; margin-left: 10px;
+  }
+
+  .main { padding: 20px 28px; max-width: 1400px; margin: 0 auto; }
+
+  /* KPI Cards */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px;
+  }
+  .kpi .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi .value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi .sub { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .kpi.active .value { color: var(--green); }
+  .kpi.upcoming .value { color: var(--yellow); }
+  .kpi.ended .value { color: var(--text-dim); }
+
+  /* Filters */
+  .filters {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+  }
+  .filter-label { color: var(--text-dim); font-size: 12px; font-weight: 500; }
+  .filter-btn {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-dim); font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .filter-sep { width: 1px; height: 20px; background: var(--border); }
+
+  /* Two-column layout */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px 12px; border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-header .count { font-size: 11px; color: var(--text-dim); font-weight: 400; }
+  .card-body { padding: 16px 18px; }
+
+  /* Gantt */
+  .gantt-wrap { overflow-x: auto; }
+  .gantt { min-width: 600px; }
+  .gantt-header { display: flex; margin-bottom: 6px; }
+  .gantt-label-col { width: 180px; flex-shrink: 0; }
+  .gantt-timeline { flex: 1; display: flex; position: relative; }
+  .gantt-day {
+    flex: 1; text-align: center; font-size: 10px; color: var(--text-dim);
+    border-left: 1px solid var(--border); padding: 2px 0;
+  }
+  .gantt-day.today-col { color: var(--accent2); font-weight: 700; }
+  .gantt-row { display: flex; align-items: center; margin-bottom: 4px; min-height: 26px; }
+  .gantt-row-label {
+    width: 180px; flex-shrink: 0; font-size: 11px; color: var(--text-dim);
+    padding-right: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .gantt-bar-area { flex: 1; position: relative; height: 26px; }
+  .gantt-bar {
+    position: absolute; height: 18px; top: 4px; border-radius: 4px;
+    font-size: 10px; color: #fff; display: flex; align-items: center;
+    padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: default; transition: opacity 0.15s; min-width: 4px;
+  }
+  .gantt-bar:hover { opacity: 0.85; }
+  .gantt-bar.active { background: var(--green); }
+  .gantt-bar.upcoming { background: var(--yellow); }
+  .gantt-bar.ended { background: var(--text-dim); }
+  .today-line {
+    position: absolute; top: 0; bottom: 0; width: 1px;
+    background: var(--accent); opacity: 0.8; z-index: 5;
+    pointer-events: none;
+  }
+
+  /* Bar chart */
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-row-label { width: 110px; font-size: 12px; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+  .bar-track { flex: 1; background: var(--surface2); border-radius: 4px; height: 18px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; display: flex; align-items: center; padding-left: 8px; }
+  .bar-fill span { font-size: 11px; font-weight: 600; color: #fff; }
+  .bar-row-count { width: 24px; font-size: 12px; font-weight: 600; color: var(--text); text-align: right; flex-shrink: 0; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { padding: 8px 12px; text-align: left; color: var(--text-dim); font-weight: 500; font-size: 11px;
+    border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.4px; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px;
+    font-weight: 600; letter-spacing: 0.3px;
+  }
+  .badge.active { background: #16532a; color: var(--green); }
+  .badge.upcoming { background: #44300a; color: var(--yellow); }
+  .badge.ended { background: #2a2a2a; color: #888; }
+  .brand-chip {
+    display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px;
+    font-weight: 700; letter-spacing: 0.4px;
+  }
+  .brand-MLB { background: #1e2040; color: #818cf8; }
+  .brand-DISCOVERY { background: #1e3320; color: #4ade80; }
+  .brand-DUVETICA { background: #3d1e1e; color: #f87171; }
+  .brand-SA { background: #3d2e1e; color: #fb923c; }
+  .brand-SUPRA { background: #1e3040; color: #38bdf8; }
+  .brand-TAILORED { background: #2d1e3d; color: #c084fc; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>IMC 프로모션 대시보드</h1>
+    <span class="today-badge">TODAY 2026-05-20</span>
+  </div>
+  <span class="date">6개 브랜드 · 5개 채널</span>
+</header>
+
+<div class="main">
+
+  <!-- KPI -->
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- Filters -->
+  <div class="filters" id="filters"></div>
+
+  <!-- Gantt + Brand bars -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header">
+        <span>프로모션 타임라인</span>
+        <span class="count" id="ganttCount"></span>
+      </div>
+      <div class="card-body" style="padding: 12px 14px;">
+        <div class="gantt-wrap">
+          <div class="gantt" id="ganttChart"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-header"><span>브랜드별 프로모션 수</span></div>
+        <div class="card-body">
+          <div class="bar-chart" id="brandChart"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span>채널별 프로모션 수</span></div>
+        <div class="card-body">
+          <div class="bar-chart" id="channelChart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="card-header">
+      <span>프로모션 목록</span>
+      <span class="count" id="tableCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>브랜드</th>
+            <th>채널</th>
+            <th>프로모션명</th>
+            <th>시작일</th>
+            <th>종료일</th>
+            <th>상태</th>
+            <th>기간(일)</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const RAW = [
+  {"BRAND":"MLB","CHANNEL":"자사몰","PROMO_NAME":"봄맞이 할인전","START_DATE":"2026-04-15","END_DATE":"2026-05-10","STATUS":"종료"},
+  {"BRAND":"MLB","CHANNEL":"자사몰","PROMO_NAME":"어버이날 기획전","START_DATE":"2026-05-01","END_DATE":"2026-05-15","STATUS":"진행중"},
+  {"BRAND":"MLB","CHANNEL":"무신사","PROMO_NAME":"MLB 신상 발매","START_DATE":"2026-04-20","END_DATE":"2026-05-08","STATUS":"종료"},
+  {"BRAND":"MLB","CHANNEL":"무신사","PROMO_NAME":"스프링 컬렉션","START_DATE":"2026-05-10","END_DATE":"2026-05-25","STATUS":"진행중"},
+  {"BRAND":"MLB","CHANNEL":"SSF샵","PROMO_NAME":"MLB X SSF 단독","START_DATE":"2026-05-05","END_DATE":"2026-05-18","STATUS":"진행중"},
+  {"BRAND":"DISCOVERY","CHANNEL":"자사몰","PROMO_NAME":"가정의달 특가","START_DATE":"2026-05-01","END_DATE":"2026-05-14","STATUS":"진행중"},
+  {"BRAND":"DISCOVERY","CHANNEL":"자사몰","PROMO_NAME":"여름 캠핑 기획전","START_DATE":"2026-05-20","END_DATE":"2026-06-15","STATUS":"예정"},
+  {"BRAND":"DISCOVERY","CHANNEL":"무신사","PROMO_NAME":"디스커버리 봄세일","START_DATE":"2026-04-25","END_DATE":"2026-05-09","STATUS":"종료"},
+  {"BRAND":"DISCOVERY","CHANNEL":"무신사","PROMO_NAME":"썸머 룩북","START_DATE":"2026-05-15","END_DATE":"2026-05-30","STATUS":"진행중"},
+  {"BRAND":"DISCOVERY","CHANNEL":"SSG닷컴","PROMO_NAME":"프리미엄 백팩 단독","START_DATE":"2026-05-01","END_DATE":"2026-05-17","STATUS":"진행중"},
+  {"BRAND":"DUVETICA","CHANNEL":"자사몰","PROMO_NAME":"F/W 프리오더","START_DATE":"2026-04-10","END_DATE":"2026-05-05","STATUS":"종료"},
+  {"BRAND":"DUVETICA","CHANNEL":"자사몰","PROMO_NAME":"스프링 클리어런스","START_DATE":"2026-05-01","END_DATE":"2026-05-20","STATUS":"진행중"},
+  {"BRAND":"STRETCH ANGELS","CHANNEL":"자사몰","PROMO_NAME":"화이트데이 기획전","START_DATE":"2026-03-01","END_DATE":"2026-03-15","STATUS":"종료"},
+  {"BRAND":"STRETCH ANGELS","CHANNEL":"자사몰","PROMO_NAME":"라이트백 출시","START_DATE":"2026-05-10","END_DATE":"2026-05-19","STATUS":"진행중"},
+  {"BRAND":"STRETCH ANGELS","CHANNEL":"29CM","PROMO_NAME":"SA X 29CM 콜라보","START_DATE":"2026-05-12","END_DATE":"2026-05-26","STATUS":"진행중"},
+  {"BRAND":"SUPRA","CHANNEL":"자사몰","PROMO_NAME":"스니커즈 페스타","START_DATE":"2026-04-20","END_DATE":"2026-05-11","STATUS":"종료"},
+  {"BRAND":"SUPRA","CHANNEL":"무신사","PROMO_NAME":"SUPRA 신상","START_DATE":"2026-05-05","END_DATE":"2026-06-05","STATUS":"진행중"},
+  {"BRAND":"TAILORED","CHANNEL":"자사몰","PROMO_NAME":"봄 클래식","START_DATE":"2026-04-15","END_DATE":"2026-05-10","STATUS":"종료"},
+  {"BRAND":"TAILORED","CHANNEL":"SSF샵","PROMO_NAME":"비즈니스 캐주얼","START_DATE":"2026-05-01","END_DATE":"2026-05-20","STATUS":"진행중"}
+];
+
+const TODAY = new Date("2026-05-20");
+const STATUS_MAP = { "진행중": "active", "예정": "upcoming", "종료": "ended" };
+const BRAND_CLASS = {
+  "MLB": "brand-MLB", "DISCOVERY": "brand-DISCOVERY", "DUVETICA": "brand-DUVETICA",
+  "STRETCH ANGELS": "brand-SA", "SUPRA": "brand-SUPRA", "TAILORED": "brand-TAILORED"
+};
+const BRAND_COLORS = {
+  "MLB": "#6366f1", "DISCOVERY": "#22c55e", "DUVETICA": "#f87171",
+  "STRETCH ANGELS": "#fb923c", "SUPRA": "#38bdf8", "TAILORED": "#c084fc"
+};
+
+let filterBrand = "ALL";
+let filterChannel = "ALL";
+let filterStatus = "ALL";
+
+const brands = ["ALL", ...new Set(RAW.map(d => d.BRAND))];
+const channels = ["ALL", ...new Set(RAW.map(d => d.CHANNEL))];
+const statuses = ["ALL", "진행중", "예정", "종료"];
+
+function filtered() {
+  return RAW.filter(d =>
+    (filterBrand === "ALL" || d.BRAND === filterBrand) &&
+    (filterChannel === "ALL" || d.CHANNEL === filterChannel) &&
+    (filterStatus === "ALL" || d.STATUS === filterStatus)
+  );
+}
+
+function renderKPI() {
+  const data = filtered();
+  const total = data.length;
+  const active = data.filter(d => d.STATUS === "진행중").length;
+  const upcoming = data.filter(d => d.STATUS === "예정").length;
+  const ended = data.filter(d => d.STATUS === "종료").length;
+
+  document.getElementById("kpiRow").innerHTML = `
+    <div class="kpi">
+      <div class="label">전체 프로모션</div>
+      <div class="value">${total}</div>
+      <div class="sub">건</div>
+    </div>
+    <div class="kpi active">
+      <div class="label">진행중</div>
+      <div class="value">${active}</div>
+      <div class="sub">현재 운영 중</div>
+    </div>
+    <div class="kpi upcoming">
+      <div class="label">예정</div>
+      <div class="value">${upcoming}</div>
+      <div class="sub">시작 예정</div>
+    </div>
+    <div class="kpi ended">
+      <div class="label">종료</div>
+      <div class="value">${ended}</div>
+      <div class="sub">완료됨</div>
+    </div>
+  `;
+}
+
+function renderFilters() {
+  const el = document.getElementById("filters");
+  let html = `<span class="filter-label">브랜드</span>`;
+  brands.forEach(b => {
+    html += `<button class="filter-btn ${filterBrand===b?'active':''}" onclick="setFilter('brand','${b}')">${b==="ALL"?"전체":b}</button>`;
+  });
+  html += `<div class="filter-sep"></div><span class="filter-label">채널</span>`;
+  channels.forEach(c => {
+    html += `<button class="filter-btn ${filterChannel===c?'active':''}" onclick="setFilter('channel','${c}')">${c==="ALL"?"전체":c}</button>`;
+  });
+  html += `<div class="filter-sep"></div><span class="filter-label">상태</span>`;
+  statuses.forEach(s => {
+    html += `<button class="filter-btn ${filterStatus===s?'active':''}" onclick="setFilter('status','${s}')">${s==="ALL"?"전체":s}</button>`;
+  });
+  el.innerHTML = html;
+}
+
+function setFilter(type, val) {
+  if (type === 'brand') filterBrand = val;
+  else if (type === 'channel') filterChannel = val;
+  else filterStatus = val;
+  renderAll();
+}
+
+function renderGantt() {
+  const data = filtered();
+  if (!data.length) {
+    document.getElementById("ganttChart").innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:30px;">데이터 없음</div>';
+    return;
+  }
+
+  const allDates = data.flatMap(d => [new Date(d.START_DATE), new Date(d.END_DATE)]);
+  let minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+  let maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+  // pad
+  minDate.setDate(minDate.getDate() - 2);
+  maxDate.setDate(maxDate.getDate() + 2);
+
+  const totalDays = Math.ceil((maxDate - minDate) / 86400000);
+  const todayOffset = Math.max(0, Math.min(1, (TODAY - minDate) / (maxDate - minDate)));
+
+  // Build week markers
+  const weekMarkers = [];
+  let cur = new Date(minDate);
+  while (cur <= maxDate) {
+    if (cur.getDay() === 1 || weekMarkers.length === 0) {
+      weekMarkers.push(new Date(cur));
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Sample label dates
+  const labelDates = [];
+  const step = Math.ceil(totalDays / 8);
+  for (let i = 0; i <= totalDays; i += step) {
+    const d = new Date(minDate);
+    d.setDate(d.getDate() + i);
+    labelDates.push(d);
+  }
+
+  function pct(date) {
+    return ((date - minDate) / (maxDate - minDate) * 100).toFixed(2) + "%";
+  }
+  function fmtDate(d) {
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  }
+
+  let html = `<div style="position:relative;">`;
+
+  // Header row
+  html += `<div style="display:flex;margin-bottom:6px;padding-left:180px;position:relative;">`;
+  labelDates.forEach((d, i) => {
+    const left = ((d - minDate) / (maxDate - minDate) * 100).toFixed(1);
+    const isToday = d.toDateString() === TODAY.toDateString();
+    html += `<div style="position:absolute;left:${left}%;transform:translateX(-50%);font-size:10px;color:${isToday?'var(--accent2)':'var(--text-dim)'};font-weight:${isToday?'700':'400'}">${fmtDate(d)}</div>`;
+  });
+  html += `</div>`;
+
+  // Today line + rows
+  html += `<div style="position:relative;">`;
+  // Grid lines for label dates
+  labelDates.forEach(d => {
+    const left = ((d - minDate) / (maxDate - minDate) * 100).toFixed(1);
+    html += `<div style="position:absolute;left:calc(180px + ${left}% * (100% - 180px) / 100);top:0;bottom:0;width:1px;background:var(--border);opacity:0.5;z-index:1;pointer-events:none;"></div>`;
+  });
+
+  // Today line
+  const todayLeft = ((TODAY - minDate) / (maxDate - minDate) * 100).toFixed(1);
+  html += `<div style="position:absolute;left:calc(180px + ${todayLeft}% * (100% - 180px) / 100);top:0;bottom:0;width:2px;background:var(--accent);z-index:4;opacity:0.9;pointer-events:none;"></div>`;
+
+  data.forEach(d => {
+    const s = new Date(d.START_DATE);
+    const e = new Date(d.END_DATE);
+    const cls = STATUS_MAP[d.STATUS] || "ended";
+    const left = ((s - minDate) / (maxDate - minDate) * 100).toFixed(1);
+    const width = ((e - s) / (maxDate - minDate) * 100).toFixed(1);
+    const color = BRAND_COLORS[d.BRAND] || "#6366f1";
+    const labelShort = d.PROMO_NAME.length > 14 ? d.PROMO_NAME.slice(0, 13) + "…" : d.PROMO_NAME;
+    const days = Math.ceil((e - s) / 86400000);
+    const title = `${d.BRAND} · ${d.CHANNEL}\n${d.PROMO_NAME}\n${d.START_DATE} ~ ${d.END_DATE} (${days}일)\n${d.STATUS}`;
+
+    html += `
+      <div style="display:flex;align-items:center;margin-bottom:5px;min-height:26px;position:relative;z-index:2;">
+        <div style="width:180px;flex-shrink:0;font-size:10px;color:var(--text-dim);padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.BRAND} ${d.CHANNEL}">
+          <span style="font-size:9px;font-weight:700;color:${color};margin-right:4px;">${d.BRAND.split(' ')[0]}</span>${d.CHANNEL}
+        </div>
+        <div style="flex:1;position:relative;height:24px;">
+          <div class="gantt-bar ${cls}" title="${title}"
+            style="left:${left}%;width:max(${width}%,4px);background:${cls==='active'?color:cls==='upcoming'?'var(--yellow)':'var(--border)'};opacity:${cls==='ended'?0.5:1};">
+            ${parseFloat(width) > 10 ? labelShort : ''}
+          </div>
+        </div>
+      </div>`;
+  });
+
+  html += `</div></div>`;
+  document.getElementById("ganttChart").innerHTML = html;
+  document.getElementById("ganttCount").textContent = `${data.length}건`;
+}
+
+function renderBarChart(containerId, groupKey) {
+  const data = filtered();
+  const counts = {};
+  const colors = {};
+  data.forEach(d => {
+    const k = d[groupKey];
+    counts[k] = (counts[k] || 0) + 1;
+    if (groupKey === "BRAND") colors[k] = BRAND_COLORS[k] || "#6366f1";
+  });
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = entries[0]?.[1] || 1;
+
+  const el = document.getElementById(containerId);
+  if (!entries.length) { el.innerHTML = '<div style="color:var(--text-dim);text-align:center;padding:20px;">데이터 없음</div>'; return; }
+
+  el.innerHTML = entries.map(([k, v]) => {
+    const pct = (v / max * 100).toFixed(0);
+    const color = colors[k] || "var(--accent)";
+    return `
+      <div class="bar-row">
+        <div class="bar-row-label">${k}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pct}%;background:${color};"><span>${v}</span></div>
+        </div>
+        <div class="bar-row-count">${v}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderTable() {
+  const data = filtered();
+  document.getElementById("tableCount").textContent = `${data.length}건`;
+
+  const sorted = [...data].sort((a, b) => {
+    const order = {"진행중":0,"예정":1,"종료":2};
+    return (order[a.STATUS]??3) - (order[b.STATUS]??3) || new Date(b.START_DATE) - new Date(a.START_DATE);
+  });
+
+  document.getElementById("tableBody").innerHTML = sorted.map(d => {
+    const cls = STATUS_MAP[d.STATUS] || "ended";
+    const bCls = BRAND_CLASS[d.BRAND] || "brand-MLB";
+    const days = Math.ceil((new Date(d.END_DATE) - new Date(d.START_DATE)) / 86400000);
+    return `
+      <tr>
+        <td><span class="brand-chip ${bCls}">${d.BRAND}</span></td>
+        <td>${d.CHANNEL}</td>
+        <td style="font-weight:500;">${d.PROMO_NAME}</td>
+        <td style="color:var(--text-dim);">${d.START_DATE}</td>
+        <td style="color:var(--text-dim);">${d.END_DATE}</td>
+        <td><span class="badge ${cls}">${d.STATUS}</span></td>
+        <td style="color:var(--text-dim);text-align:right;">${days}일</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderAll() {
+  renderKPI();
+  renderFilters();
+  renderGantt();
+  renderBarChart("brandChart", "BRAND");
+  renderBarChart("channelChart", "CHANNEL");
+  renderTable();
+}
+
+renderAll();
+</script>
+</body>
+</html>
